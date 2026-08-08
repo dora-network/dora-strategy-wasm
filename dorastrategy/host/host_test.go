@@ -43,7 +43,7 @@ func TestGetParamBool_NotWired(t *testing.T) {
 }
 
 func TestSubmitOrder_NotWired(t *testing.T) {
-	_, err := host.SubmitOrder(host.OrderIntent{Side: "buy", Quantity: 1, Type: "market"})
+	_, err := host.SubmitOrder(host.OrderIntent{Side: "buy", Quantity: "1", Type: "market"})
 	if !errors.Is(err, host.ErrNotWired) {
 		t.Fatalf("SubmitOrder returned err=%v, want ErrNotWired", err)
 	}

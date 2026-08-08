@@ -36,10 +36,42 @@ func TestCandleFields(t *testing.T) {
 
 func TestOrderIntent(t *testing.T) {
 	intent := dorastrategy.OrderIntent{
-		Side: "buy", Quantity: 100, Type: "limit", Price: 99.5,
+		Side:               "buy",
+		Quantity:           "100",
+		Type:               "limit",
+		Price:              "99.5",
+		InverseLeverage:    "2",
+		FromGlobalPosition: false,
 	}
 	if intent.Side != "buy" || intent.Type != "limit" {
 		t.Errorf("OrderIntent field round-trip failed: %+v", intent)
+	}
+	if intent.Quantity != "100" || intent.Price != "99.5" {
+		t.Errorf("decimal-string fields round-trip: %+v", intent)
+	}
+	if intent.InverseLeverage != "2" {
+		t.Errorf("InverseLeverage: got %q want \"2\"", intent.InverseLeverage)
+	}
+	if intent.FromGlobalPosition {
+		t.Errorf("FromGlobalPosition: got true want false (default isolated margin)")
+	}
+}
+
+// TestOrderIntent_Defaults verifies the zero value semantics: a fresh
+// OrderIntent with all fields unset represents a buy-market order
+// with no leverage on the isolated margin account. The framework
+// applies these defaults in the host; the plugin's code may rely on
+// them by leaving the fields blank.
+func TestOrderIntent_Defaults(t *testing.T) {
+	var intent dorastrategy.OrderIntent
+	if intent.Side != "" || intent.Quantity != "" || intent.Type != "" {
+		t.Errorf("zero value should be all-empty: %+v", intent)
+	}
+	if intent.FromGlobalPosition {
+		t.Errorf("zero-value FromGlobalPosition must be false (isolated margin)")
+	}
+	if intent.InverseLeverage != "" {
+		t.Errorf("zero-value InverseLeverage must be empty (host default \"1\")")
 	}
 }
 

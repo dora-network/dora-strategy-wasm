@@ -22,11 +22,19 @@ type Candle struct {
 
 // OrderIntent is the strategy's desire to trade. Mode-neutral; the
 // framework translates it into a real or simulated order.
+//
+// Field shapes mirror Dora's CreateOrderRequest (see
+// github.com/dora-network/dora-client-go/doraclient.CreateOrderRequest and
+// the dora-api OpenAPI spec for the createOrder operation). Numeric
+// fields are decimal strings, not float64, to round-trip through
+// the wire format without precision loss.
 type OrderIntent struct {
-	Side     string // "buy" | "sell"
-	Quantity float64
-	Type     string  // "market" | "limit"
-	Price    float64 // limit orders only
+	Side               string // "buy" | "sell"
+	Quantity           string // decimal string, e.g. "100", "0.5"
+	Type               string // "market" | "limit"
+	Price              string // required for limit, empty for market
+	InverseLeverage    string // decimal string; empty => host default "1" (no leverage)
+	FromGlobalPosition bool   // false (default) => isolated margin; true => global cash account
 }
 
 // Fill is the result of submitting an intent (real or simulated).

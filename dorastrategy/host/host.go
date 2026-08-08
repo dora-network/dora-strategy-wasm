@@ -27,14 +27,18 @@ const (
 )
 
 // OrderIntent is the host-side mirror of dorastrategy.OrderIntent. We
-// re-declare it here to avoid an import cycle in Plan 2; the wazero
-// import surface uses this type, the strategy module uses the
-// dorastrategy type, and the runtime converts between them.
+// re-declare it here to avoid an import cycle between the framework
+// types and the wazero import surface. The fields mirror Dora's
+// CreateOrderRequest (see dora-client-go and the dora-api OpenAPI
+// spec); numeric fields are decimal strings to round-trip the
+// wire format without precision loss.
 type OrderIntent struct {
-	Side     string
-	Quantity float64
-	Type     string
-	Price    float64
+	Side               string
+	Quantity           string
+	Type               string
+	Price              string
+	InverseLeverage    string
+	FromGlobalPosition bool
 }
 
 // Log emits a structured log line. Key-value pairs are host-side;
