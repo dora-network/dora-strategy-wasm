@@ -63,7 +63,7 @@ func (s *MyStrategy) OnCandle(c dorastrategy.Candle) ([]dorastrategy.OrderIntent
 }
 
 func main() {
-    if err := dorastrategy.Run(&MyStrategy{}, dorastrategy.Config{Mode: dorastrategy.ModeValidate}); err != nil {
+    if err := dorastrategy.Run(&MyStrategy{}); err != nil {
         panic(err)
     }
 }

@@ -13,11 +13,21 @@ const (
 	ModeLive     Mode = "live"     // real-time feeds + real orders
 )
 
-// Candle is a mode-neutral OHLCV bar. Same shape for backtest replay
-// and live-aggregated ticks.
+// Candle carries every field Dora's SDK returns for a candlestick
+// bar. All numeric fields are decimal strings to preserve precision
+// (matching the SDK wire format). StartTimestamp is RFC3339.
 type Candle struct {
-	Timestamp                      time.Time
-	Open, High, Low, Close, Volume float64
+	OrderBookID    string `json:"order_book_id"`
+	StartTimestamp string `json:"start_timestamp"`
+	Open           string `json:"open"`
+	High           string `json:"high"`
+	Low            string `json:"low"`
+	Close          string `json:"close"`
+	OpenYtm        string `json:"open_ytm"`
+	CloseYtm       string `json:"close_ytm"`
+	HighYtm        string `json:"high_ytm"`
+	LowYtm         string `json:"low_ytm"`
+	Volume         string `json:"volume"`
 }
 
 // OrderIntent is the strategy's desire to trade. Mode-neutral; the
@@ -29,30 +39,32 @@ type Candle struct {
 // fields are decimal strings, not float64, to round-trip through
 // the wire format without precision loss.
 type OrderIntent struct {
-	Side               string // "buy" | "sell"
-	Quantity           string // decimal string, e.g. "100", "0.5"
-	Type               string // "market" | "limit"
-	Price              string // required for limit, empty for market
-	InverseLeverage    string // decimal string; empty => host default "1" (no leverage)
-	FromGlobalPosition bool   // false (default) => isolated margin; true => global cash account
+	Side               string `json:"side"`                 // "buy" | "sell"
+	Quantity           string `json:"quantity"`             // decimal string, e.g. "100", "0.5"
+	Type               string `json:"type"`                 // "market" | "limit"
+	Price              string `json:"price"`                // required for limit, empty for market
+	InverseLeverage    string `json:"inverse_leverage"`     // decimal string; empty => host default "1" (no leverage)
+	FromGlobalPosition bool   `json:"from_global_position"` // false (default) => isolated margin; true => global cash account
 }
 
 // Fill is the result of submitting an intent (real or simulated).
 type Fill struct {
-	OrderID         string
-	Price, Quantity float64
-	Simulated       bool
+	OrderID   string `json:"order_id"`
+	Price     string `json:"price"`
+	Quantity  string `json:"quantity"`
+	Simulated bool   `json:"simulated"`
 }
 
 // Config is parsed by the framework from env/flags.
 type Config struct {
-	Mode        Mode
-	OrderBookID string
-	Start, End  time.Time // backtest window
-	Resolution  string    // candle resolution
-	DoraBaseURL string
-	DoraAPIKey  string
-	Params      map[string]string // strategy-specific
+	Mode        Mode              `json:"mode"`
+	OrderBookID string            `json:"order_book_id"`
+	Start       time.Time         `json:"start"` // backtest window
+	End         time.Time         `json:"end"`
+	Resolution  string            `json:"resolution"`
+	DoraBaseURL string            `json:"dora_base_url"`
+	DoraAPIKey  string            `json:"dora_api_key"`
+	Params      map[string]string `json:"params"`
 }
 
 // Strategy is the decision core the generated code implements.

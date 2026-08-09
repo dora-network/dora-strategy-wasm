@@ -24,12 +24,12 @@ type noopStrategy struct{}
 
 func (noopStrategy) Init(dorastrategy.Config) error { return nil }
 func (noopStrategy) OnCandle(dorastrategy.Candle) ([]dorastrategy.OrderIntent, error) {
-	_ = host.Log(host.LevelInfo, "noop on candle")
+	host.Log(host.LevelInfo, "noop on candle")
 	return nil, nil
 }
 
 func main() {
-	if err := dorastrategy.Run(noopStrategy{}, dorastrategy.Config{Mode: dorastrategy.ModeValidate}); err != nil {
+	if err := dorastrategy.Run(noopStrategy{}); err != nil {
 		// framework's Run only returns nil for the validate path
 		// (Init returns nil above). Panic is the right outcome if
 		// the framework is misconfigured: the binary is a smoke

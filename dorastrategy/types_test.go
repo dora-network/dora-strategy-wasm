@@ -20,17 +20,27 @@ func TestModeConstants(t *testing.T) {
 }
 
 func TestCandleFields(t *testing.T) {
-	now := time.Now()
 	c := dorastrategy.Candle{
-		Timestamp: now,
-		Open:      1.0, High: 2.0, Low: 0.5, Close: 1.5,
-		Volume: 100,
+		OrderBookID:    "OB-1234",
+		StartTimestamp: "2026-01-01T00:00:00Z",
+		Open:           "100.5",
+		High:           "101.2",
+		Low:            "99.8",
+		Close:          "100.9",
+		OpenYtm:        "0.0523",
+		CloseYtm:       "0.0519",
+		HighYtm:        "0.0525",
+		LowYtm:         "0.0517",
+		Volume:         "12500",
 	}
-	if c.Timestamp != now {
-		t.Errorf("Timestamp not round-tripped: got %v want %v", c.Timestamp, now)
+	if c.OrderBookID != "OB-1234" {
+		t.Errorf("OrderBookID: got %q", c.OrderBookID)
 	}
-	if c.Close != 1.5 {
-		t.Errorf("Close: got %v want 1.5", c.Close)
+	if c.Open != "100.5" {
+		t.Errorf("Open: got %q want decimal string", c.Open)
+	}
+	if c.OpenYtm != "0.0523" {
+		t.Errorf("OpenYtm: got %q", c.OpenYtm)
 	}
 }
 
