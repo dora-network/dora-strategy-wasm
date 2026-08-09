@@ -14,7 +14,7 @@ import (
 
 const bufSize = 8192
 
-var stackBuf [bufSize]byte
+var stackBuf [bufSize]byte //nolint:gochecknoglobals // stack buffer shared by all host calls in this package
 
 // sentinelErr is the return value indicating a host-side error.
 const sentinelErr int32 = -1
@@ -81,7 +81,7 @@ type Config struct {
 
 // GetConfig returns the strategy's Config from the host.
 func GetConfig() (Config, error) {
-	n := wasmGetConfig(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize)
+	n := wasmGetConfig(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize) //nolint:gosec // wazero ABI: pointer fits in u32
 	if n == sentinelErr {
 		return Config{}, readError()
 	}
@@ -97,7 +97,7 @@ func GetConfig() (Config, error) {
 
 // NextCandle returns the next candle, or (Candle{}, false) when done.
 func NextCandle() (Candle, bool, error) {
-	n := wasmNextCandle(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize)
+	n := wasmNextCandle(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize) //nolint:gosec // wazero ABI: pointer fits in u32
 	if n == sentinelErr {
 		return Candle{}, false, readError()
 	}
@@ -127,8 +127,8 @@ func SubmitOrder(intent OrderIntent) (Fill, error) {
 	}
 	copy(stackBuf[:inLen], intentJSON)
 	n := wasmSubmitOrder(
-		uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), uint32(inLen),
-		uint32(uintptr(unsafe.Pointer(&stackBuf[outOffset]))), uint32(bufSize/2),
+		uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), uint32(inLen), //nolint:gosec // wazero ABI
+		uint32(uintptr(unsafe.Pointer(&stackBuf[outOffset]))), uint32(bufSize/2), //nolint:gosec,mnd // wazero ABI, half-buffer split
 	)
 	if n == sentinelErr {
 		return Fill{}, readErrorOffset(outOffset)
@@ -150,7 +150,7 @@ func RecordFill(fill Fill) {
 		return
 	}
 	copy(stackBuf[:len(fillJSON)], fillJSON)
-	wasmRecordFill(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), uint32(len(fillJSON)))
+	wasmRecordFill(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), uint32(len(fillJSON))) //nolint:gosec // wazero ABI
 }
 
 // Log emits a structured log line.
@@ -172,7 +172,7 @@ func Log(level Level, msg string) {
 	if len(b) == 0 {
 		return
 	}
-	wasmLog(lvl, uint32(uintptr(unsafe.Pointer(&b[0]))), uint32(len(b)))
+	wasmLog(lvl, uint32(uintptr(unsafe.Pointer(&b[0]))), uint32(len(b))) //nolint:gosec // wazero ABI
 }
 
 // BacktestError signals a fatal error to the host.
@@ -181,7 +181,7 @@ func BacktestError(msg string) {
 	if len(b) == 0 {
 		return
 	}
-	wasmBacktestError(uint32(uintptr(unsafe.Pointer(&b[0]))), uint32(len(b)))
+	wasmBacktestError(uint32(uintptr(unsafe.Pointer(&b[0]))), uint32(len(b))) //nolint:gosec // wazero ABI
 }
 
 // readError reads the error JSON from the stack buffer. The host

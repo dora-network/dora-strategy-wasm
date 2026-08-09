@@ -43,6 +43,8 @@ func runBacktest(s Strategy, cfg Config) error {
 // Test seams. In wasm builds these point to the real host imports;
 // in unit tests they are replaced with fakes so the loop logic can be
 // exercised without a wazero runtime.
+//
+//nolint:gochecknoglobals // test seams; overridden in *_test.go
 var (
 	getConfigFn     = host.GetConfig
 	nextCandleFn    = host.NextCandle
