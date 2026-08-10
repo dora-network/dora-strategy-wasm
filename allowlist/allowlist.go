@@ -47,8 +47,18 @@ var denied = map[string]struct{}{
 // that imports a sub-package (e.g. .../dorastrategy/host) matches
 // the parent prefix.
 //
+// allowedFramework lists every package in this sub-module the
+// strategy may import. The keys are import path prefixes; a plugin
+// that imports a sub-package (e.g. .../dorastrategy/host) matches
+// the parent prefix. The module root itself is also allowed so that
+// `require github.com/dora-network/dora-strategy-wasm v0.0.0` (the form
+// go.mod requires) passes the check — all sub-packages are children
+// of this root, and the deny list still rejects anything explicitly
+// bad.
+//
 //nolint:gochecknoglobals // ponytail: constant prefix list, not state.
 var allowedFramework = []string{
+	"github.com/dora-network/dora-strategy-wasm",
 	"github.com/dora-network/dora-strategy-wasm/dorastrategy",
 	"github.com/dora-network/dora-strategy-wasm/manifest",
 	"github.com/dora-network/dora-strategy-wasm/allowlist",

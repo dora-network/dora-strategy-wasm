@@ -8,6 +8,9 @@ import (
 
 func TestIsAllowed_FrameworkImports(t *testing.T) {
 	allowed := []string{
+		// Module root — go.mod `require` entries use this path.
+		"github.com/dora-network/dora-strategy-wasm",
+		// Sub-packages.
 		"github.com/dora-network/dora-strategy-wasm/dorastrategy",
 		"github.com/dora-network/dora-strategy-wasm/dorastrategy/host",
 		"github.com/dora-network/dora-strategy-wasm/dorastrategy/escape",
