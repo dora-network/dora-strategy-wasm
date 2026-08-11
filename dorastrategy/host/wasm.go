@@ -13,6 +13,9 @@ func wasmGetConfig(bufPtr uint32, bufLen uint32) int32
 //go:wasmimport env host_next_candle
 func wasmNextCandle(bufPtr uint32, bufLen uint32) int32
 
+//go:wasmimport env host_next_live_candle
+func wasmNextLiveCandle(bufPtr uint32, bufLen uint32) int32
+
 //go:wasmimport env host_submit_order
 func wasmSubmitOrder(inPtr uint32, inLen uint32, outPtr uint32, outLen uint32) int32
 

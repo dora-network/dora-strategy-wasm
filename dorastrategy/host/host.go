@@ -114,6 +114,25 @@ func NextCandle() (Candle, bool, error) {
 	return c, true, nil
 }
 
+// NextLiveCandle returns the next live candle, blocking until one is available.
+func NextLiveCandle() (Candle, bool, error) {
+	n := wasmNextLiveCandle(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize) //nolint:gosec // wazero ABI: pointer fits in u32
+	if n == sentinelErr {
+		return Candle{}, false, readError()
+	}
+	if n == 0 {
+		return Candle{}, false, nil
+	}
+	if n < 0 {
+		return Candle{}, false, errors.New("host: next_live_candle returned invalid length")
+	}
+	var c Candle
+	if err := json.Unmarshal(stackBuf[:n], &c); err != nil {
+		return Candle{}, false, fmt.Errorf("host: decode live candle: %w", err)
+	}
+	return c, true, nil
+}
+
 // SubmitOrder sends an intent and returns the simulated fill.
 func SubmitOrder(intent OrderIntent) (Fill, error) {
 	intentJSON, err := json.Marshal(intent)

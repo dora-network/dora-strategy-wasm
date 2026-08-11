@@ -40,6 +40,8 @@ func Run(s Strategy) error {
 		return s.Init(cfg)
 	case ModeBacktest:
 		return runBacktest(s, cfg)
+	case ModeLive:
+		return runLive(s, cfg)
 	default:
 		return ErrModeNotImplemented
 	}

@@ -132,18 +132,6 @@ func TestRun_BacktestMode_PropagatesOnCandleError(t *testing.T) {
 	}
 }
 
-func TestRun_LiveMode_NotImplemented(t *testing.T) {
-	orig := getConfigFn
-	getConfigFn = func() (host.Config, error) {
-		return host.Config{Mode: "live"}, nil
-	}
-	defer func() { getConfigFn = orig }()
-
-	if err := Run(&recordingStrategy{}); !errors.Is(err, ErrModeNotImplemented) {
-		t.Fatalf("Run returned err=%v, want ErrModeNotImplemented", err)
-	}
-}
-
 type recordingStrategy struct {
 	initCalled      bool
 	initErr         error

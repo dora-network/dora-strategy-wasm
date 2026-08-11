@@ -46,9 +46,10 @@ func runBacktest(s Strategy, cfg Config) error {
 //
 //nolint:gochecknoglobals // test seams; overridden in *_test.go
 var (
-	getConfigFn     = host.GetConfig
-	nextCandleFn    = host.NextCandle
-	submitOrderFn   = host.SubmitOrder
-	recordFillFn    = host.RecordFill
-	backtestErrorFn = host.BacktestError
+	getConfigFn      = host.GetConfig
+	nextCandleFn     = host.NextCandle
+	nextLiveCandleFn = host.NextLiveCandle
+	submitOrderFn    = host.SubmitOrder
+	recordFillFn     = host.RecordFill
+	backtestErrorFn  = host.BacktestError
 )
