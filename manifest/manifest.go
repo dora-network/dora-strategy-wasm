@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/dora-network/dora-strategy-wasm/dorastrategy"
 )
 
 // SupportedSchemaVersion is the only schema_version the host
@@ -27,27 +29,58 @@ var AllowedParamTypes = map[string]struct{}{
 
 // Manifest is the JSON object a plugin emits next to its .wasm.
 type Manifest struct {
-	SchemaVersion int    `json:"schema_version"`
-	ModuleName    string `json:"module_name"`
-	Language      string `json:"language"`
+	SchemaVersion    int    `json:"schema_version"`
+	ModuleName       string `json:"module_name"`
+	FrameworkVersion string `json:"framework_version"`
+	Language         string `json:"language"`
 	//nolint:tagliatelle // standard TinyGo project name; rename would diverge from spec.
-	TinyGoVersion string            `json:"tinygo_version,omitempty"`
-	GoVersion     string            `json:"go_version,omitempty"`
-	Capabilities  Capabilities      `json:"capabilities"`
-	ParamsSchema  map[string]string `json:"params_schema"`
+	TinyGoVersion string               `json:"tinygo_version,omitempty"`
+	GoVersion     string               `json:"go_version,omitempty"`
+	Capabilities  Capabilities         `json:"capabilities"`
+	ParamsSchema  map[string]string    `json:"params_schema"`
+	Preamble      PreambleCapabilities `json:"preamble"`
 }
 
 // Capabilities declares what the plugin is allowed to do.
 type Capabilities struct {
 	OrderBooks    []string `json:"order_books"`
 	Resolutions   []string `json:"resolutions,omitempty"`
-	Channels      []string `json:"channels,omitempty"`
+	Channels      []string `json:"channels,omitempty"`  // "candle" | "trade" | "price"
+	AssetIDs      []string `json:"asset_ids,omitempty"` //nolint:tagliatelle // asyncapi name; required when "price" in Channels
 	HostFunctions []string `json:"host_functions"`
+}
+
+// PreambleCapabilities declares the constraints on the strategy's
+// OnPreamble phase. The preamble is read-only historical analysis;
+// the host gates order submission.
+type PreambleCapabilities struct {
+	WarmupCandles int `json:"warmup_candles"` // resolution-spaced candles
 }
 
 // Validate enforces the spec's mandatory fields. Returns nil on
 // success, a typed error describing the first failure otherwise.
 func (m Manifest) Validate() error {
+	if m.FrameworkVersion == "" {
+		return errors.New("manifest: framework_version is required")
+	}
+	if m.FrameworkVersion != dorastrategy.FrameworkVersion {
+		return fmt.Errorf("manifest: framework_version %q does not match expected %q (rebuild the strategy against the current framework)",
+			m.FrameworkVersion, dorastrategy.FrameworkVersion)
+	}
+	if m.Preamble.WarmupCandles < 0 {
+		return errors.New("manifest: preamble.warmup_candles must be >= 0")
+	}
+	hasPrice := false
+	for _, ch := range m.Capabilities.Channels {
+		if ch == "price" {
+			hasPrice = true
+			break
+		}
+	}
+	if hasPrice && len(m.Capabilities.AssetIDs) != 1 {
+		return fmt.Errorf("manifest: channels includes 'price' but asset_ids has %d entries "+
+			"(must be exactly 1 for the POC)", len(m.Capabilities.AssetIDs))
+	}
 	if m.SchemaVersion != SupportedSchemaVersion {
 		return fmt.Errorf("manifest: schema_version %d not supported (want %d)",
 			m.SchemaVersion, SupportedSchemaVersion)

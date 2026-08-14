@@ -133,6 +133,7 @@ func TestRun_BacktestMode_PropagatesOnCandleError(t *testing.T) {
 }
 
 type recordingStrategy struct {
+	StrategyBase
 	initCalled      bool
 	initErr         error
 	candleCalled    bool

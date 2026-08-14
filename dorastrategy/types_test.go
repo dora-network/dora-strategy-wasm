@@ -1,6 +1,7 @@
 package dorastrategy_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -110,9 +111,164 @@ func TestStrategyInterface(t *testing.T) {
 	var _ dorastrategy.Strategy = stubStrategy{}
 }
 
-type stubStrategy struct{}
+type stubStrategy struct {
+	dorastrategy.StrategyBase
+}
 
 func (stubStrategy) Init(dorastrategy.Config) error { return nil }
 func (stubStrategy) OnCandle(dorastrategy.Candle) ([]dorastrategy.OrderIntent, error) {
 	return nil, nil
+}
+
+func TestTradeFields(t *testing.T) {
+	tr := dorastrategy.Trade{
+		TransactionID:      "tx-1",
+		OrderBookID:        "OB-1",
+		OrderID:            "order-1",
+		OrderSeq:           42,
+		UserID:             "user-1",
+		Asset0:             "asset-1",
+		Price:              "100.5",
+		Quantity0:          "10.0",
+		Side:               "BUY",
+		AggressorIndicator: true,
+		CreatedAt:          "2026-01-01T00:00:00Z",
+	}
+	if tr.TransactionID != "tx-1" {
+		t.Errorf("TransactionID = %q, want %q", tr.TransactionID, "tx-1")
+	}
+	if tr.Asset0 != "asset-1" {
+		t.Errorf("Asset0 = %q, want %q", tr.Asset0, "asset-1")
+	}
+	if tr.Quantity0 != "10.0" {
+		t.Errorf("Quantity0 = %q, want %q", tr.Quantity0, "10.0")
+	}
+	if !tr.AggressorIndicator {
+		t.Errorf("AggressorIndicator = false, want true")
+	}
+}
+
+func TestPriceFields(t *testing.T) {
+	p := dorastrategy.Price{
+		AssetID: "asset-1",
+		Price:   "100.5",
+		YTM:     "0.0523",
+		Time:    "2026-01-01T00:00:00Z",
+	}
+	if p.AssetID != "asset-1" {
+		t.Errorf("AssetID = %q, want %q", p.AssetID, "asset-1")
+	}
+	if p.YTM != "0.0523" {
+		t.Errorf("YTM = %q, want %q", p.YTM, "0.0523")
+	}
+}
+
+func TestFrameworkVersionDefaultIsDev(t *testing.T) {
+	// Default is "dev". The agent's validate path overwrites this
+	// at build time via -ldflags. FrameworkVersion is a var
+	// specifically so the validate path can set it without a
+	// full framework rebuild.
+	orig := dorastrategy.FrameworkVersion
+	t.Cleanup(func() { dorastrategy.FrameworkVersion = orig })
+
+	dorastrategy.FrameworkVersion = "test-version"
+	if dorastrategy.FrameworkVersion != "test-version" {
+		t.Errorf("FrameworkVersion assignment broken: got %q", dorastrategy.FrameworkVersion)
+	}
+}
+
+type fakePreamble struct {
+	candleCalls int
+	tradeCalls  int
+	priceCalls  int
+}
+
+func (f *fakePreamble) FetchCandles(ctx context.Context, start, end time.Time, resolution string, batchSize int) (dorastrategy.CandleBatch, error) {
+	f.candleCalls++
+	return dorastrategy.CandleBatch{Done: true}, nil
+}
+
+func (f *fakePreamble) FetchTrades(ctx context.Context, start, end time.Time, batchSize int) (dorastrategy.TradeBatch, error) {
+	f.tradeCalls++
+	return dorastrategy.TradeBatch{Done: true}, nil
+}
+
+func (f *fakePreamble) FetchPrices(ctx context.Context, start, end time.Time, batchSize int) (dorastrategy.PriceBatch, error) {
+	f.priceCalls++
+	return dorastrategy.PriceBatch{Done: true}, nil
+}
+
+func TestPreambleContextInterface(t *testing.T) {
+	// Compile-time assertion: *fakePreamble satisfies PreambleContext.
+	var _ dorastrategy.PreambleContext = (*fakePreamble)(nil)
+
+	f := &fakePreamble{}
+	ctx := t.Context()
+	_, _ = f.FetchCandles(ctx, time.Now(), time.Now(), "1m", 100)
+	_, _ = f.FetchTrades(ctx, time.Now(), time.Now(), 100)
+	_, _ = f.FetchPrices(ctx, time.Now(), time.Now(), 100)
+	if f.candleCalls != 1 || f.tradeCalls != 1 || f.priceCalls != 1 {
+		t.Errorf("counts = %d/%d/%d, want 1/1/1", f.candleCalls, f.tradeCalls, f.priceCalls)
+	}
+}
+
+func TestBatchTypes(t *testing.T) {
+	cb := dorastrategy.CandleBatch{
+		Items:  []dorastrategy.Candle{{OrderBookID: "OB-1", Close: "100"}},
+		Done:   true,
+		Cursor: "abc",
+	}
+	if len(cb.Items) != 1 || !cb.Done || cb.Cursor != "abc" {
+		t.Errorf("CandleBatch = %+v", cb)
+	}
+	tb := dorastrategy.TradeBatch{
+		Items:  []dorastrategy.Trade{{TransactionID: "tx-1"}},
+		Done:   true,
+		Cursor: "def",
+	}
+	if len(tb.Items) != 1 || !tb.Done || tb.Cursor != "def" {
+		t.Errorf("TradeBatch = %+v", tb)
+	}
+	pb := dorastrategy.PriceBatch{
+		Items:  []dorastrategy.Price{{AssetID: "asset-1"}},
+		Done:   true,
+		Cursor: "ghi",
+	}
+	if len(pb.Items) != 1 || !pb.Done || pb.Cursor != "ghi" {
+		t.Errorf("PriceBatch = %+v", pb)
+	}
+}
+
+type fullStrategy struct{}
+
+func (fullStrategy) Init(dorastrategy.Config) error { return nil }
+func (fullStrategy) OnPreamble(context.Context, dorastrategy.PreambleContext) error {
+	return nil
+}
+
+func (fullStrategy) OnCandle(dorastrategy.Candle) ([]dorastrategy.OrderIntent, error) {
+	return nil, nil
+}
+
+func (fullStrategy) OnTrade(dorastrategy.Trade) ([]dorastrategy.OrderIntent, error) {
+	return nil, nil
+}
+
+func (fullStrategy) OnPrice(dorastrategy.Price) ([]dorastrategy.OrderIntent, error) {
+	return nil, nil
+}
+
+func TestStrategyInterfaceFull(t *testing.T) {
+	// Compile-time check: fullStrategy satisfies the new Strategy.
+	var _ dorastrategy.Strategy = fullStrategy{}
+}
+
+// noopStrategy embeds the framework's StrategyBase; we expect it
+// to satisfy the interface without overriding the new hooks.
+type noopStrategy struct {
+	dorastrategy.StrategyBase
+}
+
+func TestStrategyBaseSatisfiesInterface(t *testing.T) {
+	var _ dorastrategy.Strategy = noopStrategy{}
 }

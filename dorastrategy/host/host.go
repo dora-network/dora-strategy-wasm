@@ -79,6 +79,52 @@ type Config struct {
 	Params      map[string]string `json:"params"`
 }
 
+// Trade is the host-side mirror of dorastrategy.Trade. JSON tags
+// match the wsplex /trades schema (see asyncapi.yaml).
+type Trade struct {
+	TransactionID      string `json:"transaction_id"`
+	OrderBookID        string `json:"order_book_id"`
+	OrderID            string `json:"order_id"`
+	OrderSeq           int64  `json:"order_seq"`
+	UserID             string `json:"user_id"`
+	Asset0             string `json:"asset_0"` //nolint:tagliatelle // wsplex asyncapi wire name
+	Price              string `json:"price"`
+	Quantity0          string `json:"quantity_0"` //nolint:tagliatelle // wsplex asyncapi wire name
+	Side               string `json:"side"`
+	AggressorIndicator bool   `json:"aggressor_indicator"`
+	CreatedAt          string `json:"created_at"`
+}
+
+// Price is the host-side mirror of dorastrategy.Price. JSON tags
+// match the wsplex /prices schema (see asyncapi.yaml).
+type Price struct {
+	AssetID string `json:"asset_id"`
+	Price   string `json:"price"`
+	YTM     string `json:"ytm"`
+	Time    string `json:"time"`
+}
+
+// CandleBatch is the host-side mirror of dorastrategy.CandleBatch.
+type CandleBatch struct {
+	Items  []Candle `json:"items"`
+	Done   bool     `json:"done"`
+	Cursor string   `json:"cursor"`
+}
+
+// TradeBatch is the host-side mirror of dorastrategy.TradeBatch.
+type TradeBatch struct {
+	Items  []Trade `json:"items"`
+	Done   bool    `json:"done"`
+	Cursor string  `json:"cursor"`
+}
+
+// PriceBatch is the host-side mirror of dorastrategy.PriceBatch.
+type PriceBatch struct {
+	Items  []Price `json:"items"`
+	Done   bool    `json:"done"`
+	Cursor string  `json:"cursor"`
+}
+
 // GetConfig returns the strategy's Config from the host.
 func GetConfig() (Config, error) {
 	n := wasmGetConfig(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize) //nolint:gosec // wazero ABI: pointer fits in u32
@@ -226,3 +272,67 @@ func readErrorOffset(offset int) error {
 	}
 	return errors.New(e.Error)
 }
+
+// fetchReq is the JSON envelope the host unmarshals from the
+// plugin's input buffer for the three fetch imports.
+type fetchReq struct {
+	Start      string `json:"start,omitempty"`
+	End        string `json:"end,omitempty"`
+	Resolution string `json:"resolution,omitempty"`
+	AssetID    string `json:"asset_id,omitempty"`
+	BatchSize  int    `json:"batch_size"`
+	Cursor     string `json:"cursor,omitempty"`
+}
+
+// FetchCandles is the host-side wrapper for the host_fetch_candles
+// host call. The plugin's PreambleContext calls it; the real
+// implementation reads from the history store. Tests override the
+// package-level fetchCandlesFn.
+func FetchCandles(req fetchReq) (CandleBatch, error) {
+	return fetchCandlesFn(req)
+}
+
+// FetchTrades is the trade equivalent.
+func FetchTrades(req fetchReq) (TradeBatch, error) {
+	return fetchTradesFn(req)
+}
+
+// FetchPrices is the price equivalent.
+func FetchPrices(req fetchReq) (PriceBatch, error) {
+	return fetchPricesFn(req)
+}
+
+// EventEnvelope is one tagged event the plugin sees.
+type EventEnvelope struct {
+	Type string          `json:"type"` // "candle" | "trade" | "price"
+	Data json.RawMessage `json:"data"` // raw JSON of the event
+}
+
+// NextEvent returns one tagged envelope (candle | trade |
+// price) plus a `done` flag. The plugin's loop is a plain
+// `for { ev, ok := host.NextEvent(); if !ok { break }; ...
+// }`. The live host function does a `select` across three
+// channels; the backtest host function walks the time-ordered
+// union of the pre-fetched slices.
+func NextEvent() (EventEnvelope, bool, error) {
+	return nextEventFn()
+}
+
+// Test seams. In wasm builds these point to the real host
+// imports; in tests they are replaced.
+//
+//nolint:gochecknoglobals // test seams; overridden in *_test.go
+var (
+	fetchCandlesFn = func(req fetchReq) (CandleBatch, error) {
+		return CandleBatch{Done: true}, nil
+	}
+	fetchTradesFn = func(req fetchReq) (TradeBatch, error) {
+		return TradeBatch{Done: true}, nil
+	}
+	fetchPricesFn = func(req fetchReq) (PriceBatch, error) {
+		return PriceBatch{Done: true}, nil
+	}
+	nextEventFn = func() (EventEnvelope, bool, error) {
+		return EventEnvelope{}, false, nil
+	}
+)

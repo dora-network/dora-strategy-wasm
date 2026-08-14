@@ -16,20 +16,38 @@
 package main
 
 import (
+	"context"
+
 	"github.com/dora-network/dora-strategy-wasm/dorastrategy"
 	"github.com/dora-network/dora-strategy-wasm/dorastrategy/host"
 )
 
-type noopStrategy struct{}
+type noopStrategy struct {
+	dorastrategy.StrategyBase
+}
 
-func (noopStrategy) Init(dorastrategy.Config) error { return nil }
-func (noopStrategy) OnCandle(dorastrategy.Candle) ([]dorastrategy.OrderIntent, error) {
+func (s *noopStrategy) Init(dorastrategy.Config) error {
+	host.Log(host.LevelInfo, "noop strategy init")
+	return nil
+}
+
+func (s *noopStrategy) OnCandle(c dorastrategy.Candle) ([]dorastrategy.OrderIntent, error) {
 	host.Log(host.LevelInfo, "noop on candle")
 	return nil, nil
 }
 
+func (s *noopStrategy) OnPreamble(ctx context.Context, p dorastrategy.PreambleContext) error {
+	// The example doesn't need warmup; just exit. A real
+	// strategy would call p.FetchCandles / FetchTrades /
+	// FetchPrices here.
+	return nil
+}
+
+// OnTrade and OnPrice inherit the no-op defaults from
+// StrategyBase (which returns nil, nil).
+
 func main() {
-	if err := dorastrategy.Run(noopStrategy{}); err != nil {
+	if err := dorastrategy.Run(&noopStrategy{}); err != nil {
 		// framework's Run only returns nil for the validate path
 		// (Init returns nil above). Panic is the right outcome if
 		// the framework is misconfigured: the binary is a smoke

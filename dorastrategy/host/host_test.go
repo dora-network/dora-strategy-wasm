@@ -113,3 +113,135 @@ func TestOrderIntentMirrorTags(t *testing.T) {
 		}
 	}
 }
+
+func TestTradeMirrorTags(t *testing.T) {
+	tr := host.Trade{
+		TransactionID:      "tx-1",
+		OrderBookID:        "OB-1",
+		OrderID:            "order-1",
+		OrderSeq:           42,
+		UserID:             "user-1",
+		Asset0:             "asset-1",
+		Price:              "100.5",
+		Quantity0:          "10.0",
+		Side:               "BUY",
+		AggressorIndicator: true,
+		CreatedAt:          "2026-01-01T00:00:00Z",
+	}
+	b, err := json.Marshal(tr)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, k := range []string{
+		"transaction_id", "order_book_id", "order_id", "order_seq",
+		"user_id", "asset_0", "price", "quantity_0",
+		"side", "aggressor_indicator", "created_at",
+	} {
+		if _, ok := jsonKey(b, k); !ok {
+			t.Errorf("missing JSON key %q in %s", k, string(b))
+		}
+	}
+}
+
+func TestPriceMirrorTags(t *testing.T) {
+	p := host.Price{
+		AssetID: "asset-1",
+		Price:   "100.5",
+		YTM:     "0.0523",
+		Time:    "2026-01-01T00:00:00Z",
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, k := range []string{"asset_id", "price", "ytm", "time"} {
+		if _, ok := jsonKey(b, k); !ok {
+			t.Errorf("missing JSON key %q in %s", k, string(b))
+		}
+	}
+}
+
+func TestCandleBatchMirrorTags(t *testing.T) {
+	cb := host.CandleBatch{
+		Items:  []host.Candle{{OrderBookID: "OB-1", Close: "100"}},
+		Done:   true,
+		Cursor: "abc",
+	}
+	b, err := json.Marshal(cb)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, k := range []string{"items", "done", "cursor"} {
+		if _, ok := jsonKey(b, k); !ok {
+			t.Errorf("missing JSON key %q in %s", k, string(b))
+		}
+	}
+}
+
+func TestTradeBatchMirrorTags(t *testing.T) {
+	tb := host.TradeBatch{
+		Items:  []host.Trade{{TransactionID: "tx-1"}},
+		Done:   true,
+		Cursor: "def",
+	}
+	b, err := json.Marshal(tb)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, k := range []string{"items", "done", "cursor"} {
+		if _, ok := jsonKey(b, k); !ok {
+			t.Errorf("missing JSON key %q in %s", k, string(b))
+		}
+	}
+}
+
+func TestPriceBatchMirrorTags(t *testing.T) {
+	pb := host.PriceBatch{
+		Items:  []host.Price{{AssetID: "asset-1"}},
+		Done:   true,
+		Cursor: "ghi",
+	}
+	b, err := json.Marshal(pb)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, k := range []string{"items", "done", "cursor"} {
+		if _, ok := jsonKey(b, k); !ok {
+			t.Errorf("missing JSON key %q in %s", k, string(b))
+		}
+	}
+}
+
+func TestEventEnvelopeRawData(t *testing.T) {
+	// Data is json.RawMessage so the event's raw JSON object survives
+	// a round-trip unchanged (a []byte field would base64-encode).
+	ev := host.EventEnvelope{
+		Type: "candle",
+		Data: json.RawMessage(`{"order_book_id":"OB-1","close":"100"}`),
+	}
+	b, err := json.Marshal(ev)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var got host.EventEnvelope
+	if err := json.Unmarshal(b, &got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.Type != "candle" {
+		t.Errorf("Type = %q, want %q", got.Type, "candle")
+	}
+	want := `{"order_book_id":"OB-1","close":"100"}`
+	if string(got.Data) != want {
+		t.Errorf("Data = %q, want %q (RawMessage must not base64-encode)", string(got.Data), want)
+	}
+}
+
+// jsonKey unmarshals b into a generic map and reports whether key is present.
+func jsonKey(b []byte, key string) (any, bool) {
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		panic(err)
+	}
+	v, ok := m[key]
+	return v, ok
+}

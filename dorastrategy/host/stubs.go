@@ -25,3 +25,26 @@ func wasmRecordFill(bufPtr uint32, bufLen uint32) {}
 func wasmLog(level, bufPtr, bufLen uint32) {}
 
 func wasmBacktestError(bufPtr uint32, bufLen uint32) {}
+
+// Each pairs with a //go:wasmimport declaration compiled only in wasm
+// builds; nothing references them under !wasm.
+//
+//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
+func wasmFetchCandles(inPtr, inLen, outPtr, outLen uint32) int32 {
+	return 0
+}
+
+//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
+func wasmFetchTrades(inPtr, inLen, outPtr, outLen uint32) int32 {
+	return 0
+}
+
+//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
+func wasmFetchPrices(inPtr, inLen, outPtr, outLen uint32) int32 {
+	return 0
+}
+
+//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
+func wasmNextEvent(outPtr, outLen uint32) int32 {
+	return 0
+}
