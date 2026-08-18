@@ -9,22 +9,22 @@ import (
 
 func TestRunLive_HappyPath(t *testing.T) {
 	origGetConfig := getConfigFn
-	origNext := nextLiveCandleFn
+	origNext := nextEventFn
 	origSubmit := submitOrderFn
 	getConfigFn = func() (host.Config, error) {
 		return host.Config{Mode: "live", OrderBookID: "OB-1"}, nil
 	}
 	calls := 0
-	nextLiveCandleFn = func() (host.Candle, bool, error) {
+	events := []host.EventEnvelope{
+		candleEvent(t, host.Candle{OrderBookID: "OB-1", Close: "100"}),
+		candleEvent(t, host.Candle{OrderBookID: "OB-1", Close: "101"}),
+	}
+	nextEventFn = func() (host.EventEnvelope, bool, error) {
 		calls++
-		switch calls {
-		case 1:
-			return host.Candle{OrderBookID: "OB-1", Close: "100"}, true, nil
-		case 2:
-			return host.Candle{OrderBookID: "OB-1", Close: "101"}, true, nil
-		default:
-			return host.Candle{}, false, nil
+		if calls <= len(events) {
+			return events[calls-1], true, nil
 		}
+		return host.EventEnvelope{}, false, nil
 	}
 	var submitted []host.OrderIntent
 	submitOrderFn = func(intent host.OrderIntent) (host.Fill, error) {
@@ -33,7 +33,7 @@ func TestRunLive_HappyPath(t *testing.T) {
 	}
 	defer func() {
 		getConfigFn = origGetConfig
-		nextLiveCandleFn = origNext
+		nextEventFn = origNext
 		submitOrderFn = origSubmit
 	}()
 
@@ -77,19 +77,19 @@ func TestRunLive_InitError(t *testing.T) {
 
 func TestRunLive_OnCandleError(t *testing.T) {
 	origGetConfig := getConfigFn
-	origNext := nextLiveCandleFn
+	origNext := nextEventFn
 	origErr := backtestErrorFn
 	getConfigFn = func() (host.Config, error) {
 		return host.Config{Mode: "live"}, nil
 	}
-	nextLiveCandleFn = func() (host.Candle, bool, error) {
-		return host.Candle{Close: "100"}, true, nil
+	nextEventFn = func() (host.EventEnvelope, bool, error) {
+		return candleEvent(t, host.Candle{Close: "100"}), true, nil
 	}
 	var errMsg string
 	backtestErrorFn = func(msg string) { errMsg = msg }
 	defer func() {
 		getConfigFn = origGetConfig
-		nextLiveCandleFn = origNext
+		nextEventFn = origNext
 		backtestErrorFn = origErr
 	}()
 

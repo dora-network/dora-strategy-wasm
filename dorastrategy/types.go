@@ -3,6 +3,8 @@ package dorastrategy
 import (
 	"context"
 	"time"
+
+	"github.com/dora-network/dora-strategy-wasm/dorastrategy/host"
 )
 
 // Mode selects the runtime mode of a strategy instance. The framework
@@ -177,3 +179,81 @@ func (StrategyBase) OnPreamble(context.Context, PreambleContext) error {
 func (StrategyBase) OnCandle(Candle) ([]OrderIntent, error) { return nil, nil }
 func (StrategyBase) OnTrade(Trade) ([]OrderIntent, error)   { return nil, nil }
 func (StrategyBase) OnPrice(Price) ([]OrderIntent, error)   { return nil, nil }
+
+// preambleCtx is the concrete PreambleContext the framework hands to
+// OnPreamble. It wraps the host fetch imports and threads the
+// pagination cursor across sequential calls.
+//
+// ponytail: cursors live on the struct because the committed v3
+// PreambleContext interface has no cursor parameter; OnPreamble is
+// single-threaded and strictly sequential, so this holds. Revisit
+// only if the interface ever gains a cursor param.
+type preambleCtx struct {
+	candleCursor string
+	tradeCursor  string
+	priceCursor  string
+}
+
+func (p *preambleCtx) FetchCandles(ctx context.Context, start, end time.Time, resolution string, batchSize int) (CandleBatch, error) {
+	if err := ctx.Err(); err != nil {
+		return CandleBatch{}, err
+	}
+	b, err := fetchCandlesFn(host.FetchReq{
+		Start:      start.Format(time.RFC3339),
+		End:        end.Format(time.RFC3339),
+		Resolution: resolution,
+		BatchSize:  batchSize,
+		Cursor:     p.candleCursor,
+	})
+	if err != nil {
+		return CandleBatch{}, err
+	}
+	p.candleCursor = b.Cursor
+	out := CandleBatch{Done: b.Done, Cursor: b.Cursor}
+	for _, c := range b.Items {
+		out.Items = append(out.Items, Candle(c))
+	}
+	return out, nil
+}
+
+func (p *preambleCtx) FetchTrades(ctx context.Context, start, end time.Time, batchSize int) (TradeBatch, error) {
+	if err := ctx.Err(); err != nil {
+		return TradeBatch{}, err
+	}
+	b, err := fetchTradesFn(host.FetchReq{
+		Start:     start.Format(time.RFC3339),
+		End:       end.Format(time.RFC3339),
+		BatchSize: batchSize,
+		Cursor:    p.tradeCursor,
+	})
+	if err != nil {
+		return TradeBatch{}, err
+	}
+	p.tradeCursor = b.Cursor
+	out := TradeBatch{Done: b.Done, Cursor: b.Cursor}
+	for _, tr := range b.Items {
+		out.Items = append(out.Items, Trade(tr))
+	}
+	return out, nil
+}
+
+func (p *preambleCtx) FetchPrices(ctx context.Context, start, end time.Time, batchSize int) (PriceBatch, error) {
+	if err := ctx.Err(); err != nil {
+		return PriceBatch{}, err
+	}
+	b, err := fetchPricesFn(host.FetchReq{
+		Start:     start.Format(time.RFC3339),
+		End:       end.Format(time.RFC3339),
+		BatchSize: batchSize,
+		Cursor:    p.priceCursor,
+	})
+	if err != nil {
+		return PriceBatch{}, err
+	}
+	p.priceCursor = b.Cursor
+	out := PriceBatch{Done: b.Done, Cursor: b.Cursor}
+	for _, pr := range b.Items {
+		out.Items = append(out.Items, Price(pr))
+	}
+	return out, nil
+}

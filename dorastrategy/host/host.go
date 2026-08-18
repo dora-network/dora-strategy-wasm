@@ -273,9 +273,11 @@ func readErrorOffset(offset int) error {
 	return errors.New(e.Error)
 }
 
-// fetchReq is the JSON envelope the host unmarshals from the
-// plugin's input buffer for the three fetch imports.
-type fetchReq struct {
+// FetchReq is the JSON envelope the host unmarshals from the
+// plugin's input buffer for the three fetch imports. Exported so
+// package dorastrategy (which imports host; host cannot import
+// dorastrategy) can construct preamble fetch requests.
+type FetchReq struct {
 	Start      string `json:"start,omitempty"`
 	End        string `json:"end,omitempty"`
 	Resolution string `json:"resolution,omitempty"`
@@ -284,22 +286,62 @@ type fetchReq struct {
 	Cursor     string `json:"cursor,omitempty"`
 }
 
+// fetchCall marshals req into the first half of the stack buffer,
+// calls the wasm import, and decodes the JSON result into out.
+func fetchCall(inPtr func(uint32, uint32, uint32, uint32) int32, req FetchReq, out any) error {
+	reqJSON, err := json.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("host: encode fetch request: %w", err)
+	}
+	inLen := len(reqJSON)
+	outOffset := bufSize / 2
+	if inLen > outOffset {
+		return errors.New("host: fetch request JSON exceeds half buffer")
+	}
+	copy(stackBuf[:inLen], reqJSON)
+	n := inPtr(
+		uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), uint32(inLen), //nolint:gosec // wazero ABI
+		uint32(uintptr(unsafe.Pointer(&stackBuf[outOffset]))), uint32(bufSize/2), //nolint:gosec,mnd // wazero ABI, half-buffer split
+	)
+	if n == sentinelErr {
+		return readErrorOffset(outOffset)
+	}
+	if n <= 0 {
+		return errors.New("host: fetch returned no data")
+	}
+	if err := json.Unmarshal(stackBuf[outOffset:outOffset+int(n)], out); err != nil {
+		return fmt.Errorf("host: decode fetch result: %w", err)
+	}
+	return nil
+}
+
 // FetchCandles is the host-side wrapper for the host_fetch_candles
 // host call. The plugin's PreambleContext calls it; the real
-// implementation reads from the history store. Tests override the
-// package-level fetchCandlesFn.
-func FetchCandles(req fetchReq) (CandleBatch, error) {
-	return fetchCandlesFn(req)
+// implementation reads from the history store.
+func FetchCandles(req FetchReq) (CandleBatch, error) {
+	var b CandleBatch
+	if err := fetchCall(wasmFetchCandles, req, &b); err != nil {
+		return CandleBatch{}, err
+	}
+	return b, nil
 }
 
 // FetchTrades is the trade equivalent.
-func FetchTrades(req fetchReq) (TradeBatch, error) {
-	return fetchTradesFn(req)
+func FetchTrades(req FetchReq) (TradeBatch, error) {
+	var b TradeBatch
+	if err := fetchCall(wasmFetchTrades, req, &b); err != nil {
+		return TradeBatch{}, err
+	}
+	return b, nil
 }
 
 // FetchPrices is the price equivalent.
-func FetchPrices(req fetchReq) (PriceBatch, error) {
-	return fetchPricesFn(req)
+func FetchPrices(req FetchReq) (PriceBatch, error) {
+	var b PriceBatch
+	if err := fetchCall(wasmFetchPrices, req, &b); err != nil {
+		return PriceBatch{}, err
+	}
+	return b, nil
 }
 
 // EventEnvelope is one tagged event the plugin sees.
@@ -309,30 +351,25 @@ type EventEnvelope struct {
 }
 
 // NextEvent returns one tagged envelope (candle | trade |
-// price) plus a `done` flag. The plugin's loop is a plain
+// price) plus an `ok` flag. The plugin's loop is a plain
 // `for { ev, ok := host.NextEvent(); if !ok { break }; ...
 // }`. The live host function does a `select` across three
 // channels; the backtest host function walks the time-ordered
 // union of the pre-fetched slices.
 func NextEvent() (EventEnvelope, bool, error) {
-	return nextEventFn()
-}
-
-// Test seams. In wasm builds these point to the real host
-// imports; in tests they are replaced.
-//
-//nolint:gochecknoglobals // test seams; overridden in *_test.go
-var (
-	fetchCandlesFn = func(req fetchReq) (CandleBatch, error) {
-		return CandleBatch{Done: true}, nil
+	n := wasmNextEvent(uint32(uintptr(unsafe.Pointer(&stackBuf[0]))), bufSize) //nolint:gosec // wazero ABI: pointer fits in u32
+	if n == sentinelErr {
+		return EventEnvelope{}, false, readError()
 	}
-	fetchTradesFn = func(req fetchReq) (TradeBatch, error) {
-		return TradeBatch{Done: true}, nil
-	}
-	fetchPricesFn = func(req fetchReq) (PriceBatch, error) {
-		return PriceBatch{Done: true}, nil
-	}
-	nextEventFn = func() (EventEnvelope, bool, error) {
+	if n == 0 {
 		return EventEnvelope{}, false, nil
 	}
-)
+	if n < 0 {
+		return EventEnvelope{}, false, errors.New("host: next_event returned invalid length")
+	}
+	var ev EventEnvelope
+	if err := json.Unmarshal(stackBuf[:n], &ev); err != nil {
+		return EventEnvelope{}, false, fmt.Errorf("host: decode event: %w", err)
+	}
+	return ev, true, nil
+}

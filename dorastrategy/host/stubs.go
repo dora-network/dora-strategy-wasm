@@ -26,25 +26,21 @@ func wasmLog(level, bufPtr, bufLen uint32) {}
 
 func wasmBacktestError(bufPtr uint32, bufLen uint32) {}
 
-// Each pairs with a //go:wasmimport declaration compiled only in wasm
-// builds; nothing references them under !wasm.
-//
-//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
+// Each pair corresponds to a //go:wasmimport declaration in wasm.go
+// compiled only under -tags wasm; these stubs satisfy the !wasm build
+// so the package compiles in unit tests.
 func wasmFetchCandles(inPtr, inLen, outPtr, outLen uint32) int32 {
 	return 0
 }
 
-//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
 func wasmFetchTrades(inPtr, inLen, outPtr, outLen uint32) int32 {
 	return 0
 }
 
-//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
 func wasmFetchPrices(inPtr, inLen, outPtr, outLen uint32) int32 {
 	return 0
 }
 
-//nolint:unused // wasmimport stub pairs, referenced only in wasm builds
 func wasmNextEvent(outPtr, outLen uint32) int32 {
 	return 0
 }
