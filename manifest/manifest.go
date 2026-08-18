@@ -8,8 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/dora-network/dora-strategy-wasm/dorastrategy"
 )
 
 // SupportedSchemaVersion is the only schema_version the host
@@ -63,10 +61,11 @@ func (m Manifest) Validate() error {
 	if m.FrameworkVersion == "" {
 		return errors.New("manifest: framework_version is required")
 	}
-	if m.FrameworkVersion != dorastrategy.FrameworkVersion {
-		return fmt.Errorf("manifest: framework_version %q does not match expected %q (rebuild the strategy against the current framework)",
-			m.FrameworkVersion, dorastrategy.FrameworkVersion)
-	}
+	// ponytail: presence + shape only. The value comparison belongs to
+	// the host (registry.Load), where the authoritative tag constant
+	// (prompts.WasmFrameworkVersion) is in scope. Comparing against
+	// dorastrategy.FrameworkVersion here is broken: that var is "dev" in
+	// every agent host build (the -ldflags injection is wasm-only).
 	if m.Preamble.WarmupCandles < 0 {
 		return errors.New("manifest: preamble.warmup_candles must be >= 0")
 	}

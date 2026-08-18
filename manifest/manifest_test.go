@@ -93,18 +93,9 @@ func TestManifestRequiresFrameworkVersion(t *testing.T) {
 	}
 }
 
-func TestManifestFrameworkVersionMismatch(t *testing.T) {
-	m := manifest.Manifest{
-		SchemaVersion:    1,
-		ModuleName:       "m",
-		FrameworkVersion: "v0",
-		Capabilities:     manifest.Capabilities{OrderBooks: []string{"OB-1"}, Resolutions: []string{"1m"}, Channels: []string{"candle"}, HostFunctions: []string{"host_log"}},
-		Preamble:         manifest.PreambleCapabilities{},
-	}
-	if err := m.Validate(); err == nil {
-		t.Fatal("expected error for framework_version mismatch")
-	}
-}
+// ponytail: version equality is the host's job now (registry.Load /
+// CheckFrameworkVersion); Validate only rejects absence. See
+// TestManifestRequiresFrameworkVersion for the presence check.
 
 func TestManifestPriceChannelRequiresAssetID(t *testing.T) {
 	m := manifest.Manifest{
